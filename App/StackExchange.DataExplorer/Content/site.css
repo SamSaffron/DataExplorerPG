@@ -560,23 +560,25 @@ ul.site-list .desc {
   margin-bottom: 10px;
 }
 
-
-#schema {
-  background-color: #F7F7F7;
+#query .right-group {
+  background: #FDFDFD url('images/diagonal.png') repeat scroll 0px 0px;
   border: 1px solid #CCCCCC;
-  border-left-width: 0px;
-  border-top-color: #999999;
-  cursor: default;
-  display: block;
+  cursor: default;  
   float: right;
   list-style-type: none;
-  margin-left: -1px;
-  overflow: auto;
+  margin-bottom: 0px;
+  margin-left: 0px;
   padding-left: 0px;
-  width: 30%;
+  width: 29.4%;
 }
 
-#schema .schema-table {
+#schema.right-group {
+  border-top-color: #999999;
+  overflow: auto;
+}
+
+#schema .schema-table, #history .heading {
+  background-color: #F7F7F7;
   color: #606060;
   cursor: pointer;
   border-bottom: 1px dotted #CCCCCC;
@@ -609,9 +611,68 @@ ul.site-list .desc {
   color: #800080;
 }
 
+#history {
+  margin-top: 4px;
+}
+
+#history .heading {
+  cursor: default;
+}
+
+#history ul {
+  height: 185px;
+  margin: 0px;
+  overflow: auto;
+  padding: 0px;
+}
+
+#history li {
+  background: #FFFFFF url('images/sprites.png') no-repeat scroll 3px -154px;
+  border-bottom: 1px dotted #CCCCCC;
+  padding: 5px 8px 5px 8px;
+}
+
+#history li.selected {
+  background-color: #FCFCE1; 
+}
+
+#history li:first-child {
+  background-position: 3px -180px;
+}
+
+#history li.last {
+  background-position: 3px -112px; 
+}
+
+#history li.last:first-child {
+  background-position: 3px -129px;
+}
+
+#history li .relativetime {
+  float: right;
+}
+
+#history li a {
+  display: block;
+  font-weight: bold;
+  padding-left: 13px;
+}
+
+#history li a:hover {
+  text-decoration: none; 
+}
+
 #schema-toggle {
+  background: transparent url('images/sprites.png') no-repeat scroll 100% -212px;
   float: right;
   margin-right: 0px;
+  padding-right: 18px;
+}
+
+#schema-toggle.hidden {
+  background-position: 0px -230px;
+  padding-left: 18px;
+  padding-right: 0px;
 }
 
 #schema-toggle:hover {
@@ -780,7 +841,7 @@ ul.linkbar li {
   margin-bottom: 5px;  
 }
 
-#query-results .subheader .group {
+#query-results .subheader .group, #execution-stats {
   width: 960px;
   margin: 0px auto 0px auto;
 }
@@ -789,24 +850,18 @@ ul.linkbar li {
   margin-left: 0px;
 }
 
-#result-stats {
-  padding-top: 5px;
-}
-
-#result-stats .stats {
+#execution-stats {
   color: #606060;
-  display: inline-block;
   font-weight: bold;
   padding: 6px 0px 6px 0px;
   text-align: right;
-  width: 250px;
 }
 
 #query-results .download-button {
   background: transparent url('images/sprites.png') no-repeat scroll 0px 0px;
   border-radius: 5px 5px;
-  display: inline-block;
-  margin-right: 15px;
+  float: right;
+  margin-top: 5px;
   padding: 6px 7px 6px 24px;
 }
 
@@ -822,9 +877,30 @@ ul.linkbar li {
   background-position: 4px -82px;
 }
 
+#query-results .panel {
+  border: 1px solid #D3D3D3;
+}
+
 #resultset {
   cursor: default;
   height: 500px;
+}
+
+#resultset .slick-header {
+  border-top-color: transparent;
+}
+
+#resultset .slick-cell {
+  
+}
+
+#resultset .slick-row.even {
+  background-image: none;
+}
+
+#resultset .slick-row.odd {
+  background-color: #FAFAFA;
+  background-image: none;
 }
 
 #query-params .form-row {

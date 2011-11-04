@@ -144,6 +144,7 @@
     <Compile Include="Controllers\UserController.cs" />
     <Compile Include="Controllers\VoteController.cs" />
     <Compile Include="Current.cs" />
+    <Compile Include="Dapper\Contrib\SqlMapperExtensions.cs" />
     <Compile Include="Dapper\SqlMapper.cs" />
     <Compile Include="DefaultAttribute.cs" />
     <Compile Include="ExtensionMethods.cs" />
@@ -275,6 +276,7 @@
     <Content Include="Content\qp\qp.css" />
     <Content Include="Content\qp\qp.xslt" />
     <Content Include="Scripts\codemirror\codemirror.js" />
+    <Content Include="Scripts\codemirror\runmode.js" />
     <Content Include="Scripts\codemirror\sql.js" />
     <Content Include="Scripts\jquery-1.6.4.js" />
     <Content Include="Scripts\jquery.event.drag-2.0.js" />
@@ -283,6 +285,7 @@
     <Content Include="robots.txt" />
     <Compile Include="ViewModel\QueryExecutionViewData.cs" />
     <Compile Include="ViewModel\QueryVoting.cs" />
+    <Compile Include="ViewModel\RevisionHistory.cs" />
     <Compile Include="ViewModel\SubHeader.cs" />
     <Compile Include="ViewModel\SubHeaderViewData.cs" />
   </ItemGroup>
@@ -401,6 +404,7 @@
     <Content Include="Views\SavedQuery\Viewer.cshtml" />
     <Content Include="Views\Admin\FindDuplicateUserOpenIds.cshtml" />
     <Content Include="Views\Shared\QueryResults.cshtml" />
+    <Content Include="Views\Shared\RevisionHistory.cshtml" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Models\DBContext.dbml.layout">

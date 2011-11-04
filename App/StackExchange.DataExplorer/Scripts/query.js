@@ -1,5 +1,8 @@
 ﻿DataExplorer.QueryEditor = (function () {
     var editor, field, activeError, params = {};
+        },
+        options = {
+            'mode': 'text/x-t-sql'
 
     function exists() {
         return !!editor;
@@ -15,11 +18,16 @@
         }
 
         field = target;
-        editor = CodeMirror.fromTextArea(target[0], {
-            'mode': 'text/x-t-sql',
-            'lineNumbers': true,
-            'onChange': onChange
-        });
+        target = target[0];
+
+        if (target.nodeName === 'TEXTAREA') {
+            editor = CodeMirror.fromTextArea(target, $.extend({}, options, {
+                'lineNumbers': true,
+                'onChange': onChange
+            }));
+        } else {
+            editor = CodeMirror.runMode(target[_textContent], options.mode, target);
+        }
 
         if (callback && typeof callback === 'function') {
             callback(editor);
@@ -188,6 +196,7 @@
 
 DataExplorer.ready(function () {
     var schema = $('#schema'),
+        history = $('#history'),
         panel = $('#query .left-group'),
         metadata = $('#query-metadata .info'),
         gridOptions = {
@@ -198,6 +207,7 @@ DataExplorer.ready(function () {
         error = $('#error-message'),
         form = $('#runQueryForm');
 
+    DataExplorer.QueryEditor.create('#queryBodyText');
     DataExplorer.QueryEditor.create('#sql', function (editor) {
         var wrapper, resizer, border = 2,
             toggle = $('#schema-toggle'),
@@ -215,18 +225,21 @@ DataExplorer.ready(function () {
             wrapper = $(editor.getScrollerElement());
         }
 
-        resizer = $('#wrapper').TextAreaResizer(function () {
-            var height = resizer.height();
+        function resize () {
+            var available = resizer.height(),
+                remaining = available - history.outerHeight(true);
 
-            schema.height(height - border);
+            schema.height(remaining);
 
             if (wrapper) {
-                wrapper.height(height - 10);
+                wrapper.height(available - 10);
                 editor.refresh();
             }
-        });
+        }
 
-        schema.height(resizer.height() - border);
+        resizer = $('#wrapper').TextAreaResizer(resize);
+        resize();
+        
         schema.addClass('cm-s-' + editor.getOption('theme') + '');
         schema.delegate('.schema-table', 'click', function () {
             var self = $(this);
@@ -239,8 +252,9 @@ DataExplorer.ready(function () {
         function showSchema() {
             panel.animate({ 'width': '70%' }, 'fast', function () {
                 schema.show();
+                history.show();
             });
-            toggle.text("hide schema ►").removeClass('hidden');
+            toggle.text("hide sidebar").removeClass('hidden');
 
             if (schemaPreference) {
                 schemaPreference.request({ 'value': false });
@@ -249,6 +263,7 @@ DataExplorer.ready(function () {
 
         function hideSchema(immediately) {
             schema.hide();
+            history.hide();
             
             if (immediately !== true) {
                 panel.animate({ 'width': '100%' }, 'fast');
@@ -256,7 +271,7 @@ DataExplorer.ready(function () {
                 panel.css('width', '100%');
             }
 
-            toggle.text("◄ show schema").addClass('hidden');
+            toggle.text("show sidebar").addClass('hidden');
 
             if (schemaPreference) {
                 schemaPreference.request({ 'value': true });
@@ -328,6 +343,31 @@ DataExplorer.ready(function () {
     $('#executionPlanTab').click(function () {
         QP.drawLines();
     });
+    $(window).resize(resizeResults);
+
+    function resizeResults() {
+        var defaultWidth = 950,
+            availableWidth = document.documentElement.clientWidth - 100,
+            grid = $('#resultset'),
+            gridWidth = grid.outerWidth(),
+            canvas = grid.find('.grid-canvas'),
+            canvasWidth = canvas.outerWidth(),
+            width = 0;
+
+        if (canvasWidth < defaultWidth || availableWidth < defaultWidth) {
+            grid.width(width = defaultWidth);
+        } else if (canvasWidth > availableWidth) {
+            grid.width(width = availableWidth);
+        } else {
+            grid.width(width = canvasWidth);
+        }
+
+        if (width === defaultWidth) {
+            grid.css('left', '0px');
+        } else {
+            grid.css('left', '-' + Math.round((width - defaultWidth) / 2) + 'px');
+        }
+    }
 
     // Ideally we can separate out the actual displaying bits so that the user
     // doesn't have to click the button before getting the form.
@@ -415,7 +455,12 @@ DataExplorer.ready(function () {
 
         var action = form[0].action, records = 0,
             results, height = 0, maxHeight = 500,
-            slug = response.slug;
+            slug = response.slug,
+            params = $('#query-params input[type="text"]').serialize();
+
+        if (params) {
+            params = '?' + params;
+        }
 
         if (/.*?\/\d+\/\d+$/.test(action)) {
             action = action.substring(0, action.lastIndexOf('/'));
@@ -430,15 +475,19 @@ DataExplorer.ready(function () {
             
         }
 
+        document.getElementById('messages').children[0][_textContent] = response.messages;
+
         if (!slug && /.*?\/[^\/]+$/.test(window.location.pathname)) {
             slug = window.location.pathname.substring(
-                window.location.pathname.lastIndexOf('/')
-            );
+
+            if (/\d+/.test(slug)) {
+                slug = null;
+            }
         } else if (slug && slug.indexOf('/') !== 0) {
             slug = '/' + slug;
         }
 
-        DataExplorer.template('#result-stats span', 'text', {
+        DataExplorer.template('#execution-stats', 'text', {
             'records': records,
             'time': response.executionTime === 0 ? "<1" : response.executionTime,
             'cached': response.fromCache ? ' (cached)' : ''
@@ -449,7 +498,21 @@ DataExplorer.ready(function () {
             'metas': response.excludeMetas ? 'n' : '',
             'site': response.siteName,
             'id': response.revisionId,
-            'slug': slug
+            'slug': slug,
+            'params': params
+        });
+
+        if (response.created) {
+            var title = response.created.replace(/\.\d+Z/, 'Z'),
+                href = "/" + response.siteName + "/query/edit/" + response.revisionId,
+                classes = "selected";
+
+            history.find('.selected').removeClass('selected');
+            history.children('ul').prepend('<li class="' + classes + '"><a href="' + href + '">' + response.revisionId + '<span class="relativetime" title="' + title + '"></span></a></li>');
+        }
+
+        history.find('.relativetime').each(function () {
+            this[_textContent] = Date.parseTimestamp(this.title).toRelativeTimeMini();
         });
 
         response.graph = isGraph(results);
@@ -476,6 +539,7 @@ DataExplorer.ready(function () {
             }
 
             prepareTable($('#resultset'), results, response);
+            resizeResults();
         
             // Currently this always gives us 500 because it's what #resultset has
             // set in CSS. SlickGrid needs the explicit height to render correctly
@@ -557,6 +621,7 @@ DataExplorer.ready(function () {
         });
 
         grid = new Slick.Grid(target, rows, columns, options);
+        grid.onColumnsResized = resizeResults;
     }
 
     function ColumnFormatter(base) {
@@ -781,7 +846,7 @@ function bindToolTip(graph, suffix) {
 function renderGraph(resultSet) {
 
     var options = {
-        legend: { position: "nw" },
+        legend: { position: "ne" },
         grid: { hoverable: true },
         selection: { mode: "x" },
         series: { lines: { show: true }, points: { show: true} }
@@ -794,12 +859,17 @@ function renderGraph(resultSet) {
     var series = [];
 
     for (var col = 1; col < resultSet.columns.length; col++) {
+        series.push({label: resultSet.columns[col].name, data: []});
+    }
+
+
+    for (var col = 1; col < resultSet.columns.length; col++) {
         series.push([]);
     }
 
     for (var row = 0; row < resultSet.rows.length; row++) {
         for (var col = 1; col < resultSet.columns.length; col++) {
-            series[col - 1].push([resultSet.rows[row][0], resultSet.rows[row][col]]);
+            series[col - 1].data.push([resultSet.rows[row][0], resultSet.rows[row][col]]);
         }
     }
 
