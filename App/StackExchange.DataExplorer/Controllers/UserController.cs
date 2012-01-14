@@ -68,6 +68,7 @@ order by Row asc", new { currentPage, perPage });
 
                 if (violations.Count == 0)
                 {
+                    var snapshot = Snapshotter.Start(user);
                     user.Login = HtmlUtilities.Safe(updatedUser.Login);
                     user.AboutMe = updatedUser.AboutMe;
                     user.DOB = updatedUser.DOB;
@@ -75,7 +76,7 @@ order by Row asc", new { currentPage, perPage });
                     user.Website = HtmlUtilities.Safe(updatedUser.Website);
                     user.Location = HtmlUtilities.Safe(updatedUser.Location);
 
-                    Current.DB.Users.Update(user.Id, new { user.Login, user.AboutMe, user.DOB, user.Email, user.Website, user.Location });
+                    Current.DB.Users.Update(user.Id, snapshot.Diff());
 
                     return Redirect("/users/" + user.Id);
                 }
@@ -153,7 +154,7 @@ order by Row asc", new { currentPage, perPage });
                 return PageMovedPermanentlyTo(string.Format("/users/{0}/{1}",user.Id, HtmlUtilities.URLFriendly(user.Login)) + Request.Url.Query);
             }
 
-            Database db = Current.DB;
+            DataExplorerDatabase db = Current.DB;
 
             SetHeader(user.Login);
             SelectMenuItem("Users");
