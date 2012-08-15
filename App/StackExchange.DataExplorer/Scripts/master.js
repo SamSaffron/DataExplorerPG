@@ -73,11 +73,25 @@
         });
     }
 
+    function token(object) {
+        var name = '__RequestVerificationToken',
+            token = $('input[name="' + name + '"]').val();
+
+        if (!object) {
+            return token;
+        }
+
+        object[name] = token;
+
+        return object;
+    }
+
     return {
         'init': init,
         'ready': ready,
         'options': options,
-        'template': template
+        'template': template,
+        'token': token
     };
 })(), _textContent = 'textContent' in document.createElement('span') ? 'textContent' : 'innerText';
 
@@ -237,6 +251,65 @@ $.fn.tabs = function () {
     });
 };
 
+if (!Object.keys) {
+    Object.keys = (function () {
+        var hasOwnProperty = Object.prototype.hasOwnProperty,
+        hasDontEnumBug = !({ toString: null }).propertyIsEnumerable('toString'),
+        dontEnums = [
+          'toString',
+          'toLocaleString',
+          'valueOf',
+          'hasOwnProperty',
+          'isPrototypeOf',
+          'propertyIsEnumerable',
+          'constructor'
+        ],
+        dontEnumsLength = dontEnums.length
+
+        return function (obj) {
+            if (typeof obj !== 'object' && typeof obj !== 'function' || obj === null) throw new TypeError('Object.keys called on non-object')
+
+            var result = []
+
+            for (var prop in obj) {
+                if (hasOwnProperty.call(obj, prop)) result.push(prop)
+            }
+
+            if (hasDontEnumBug) {
+                for (var i = 0; i < dontEnumsLength; i++) {
+                    if (hasOwnProperty.call(obj, dontEnums[i])) result.push(dontEnums[i])
+                }
+            }
+            return result
+        }
+    })();
+};
+
+document.create = function create(element, attributes) {
+    element = document.createElement(element);
+
+    if (attributes) {
+        if (attributes.text != null) {
+            element[_textContent] = attributes.text;
+            delete attributes.text;
+        }
+
+        var i, keys = Object.keys(attributes);
+
+        for (i = 0; i < keys.length; ++i) {
+            var key = keys[i];
+
+            if (key.toLowerCase() === 'classname') {
+                key = 'class';
+            }
+
+            element.setAttribute(key, attributes[keys[i]]);
+        }
+    }
+
+    return element;
+};
+
 if (!String.prototype.trim) {
     String.prototype.trim = function () {
         return this.replace(/^\s+|\s+$/g, '');
@@ -378,7 +451,7 @@ Date.parseTimestamp = (function () {
 
 Date.prototype.toUTC = (function () {
     function zero(val) {
-        return val < 9 ? '0' + val : val;
+        return val < 10 ? '0' + val : val;
     }
 
     return function () {
@@ -421,3 +494,134 @@ Date.prototype.toRelativeTimeMini = (function () {
         return rendered;
     };
 })();
+
+DataExplorer.initComposeButton = function (site) {
+    // Add the site selection button to the right of Compose Query
+    var button = document.getElementById('compose-button'),
+        list = button.parentNode.parentNode,
+        item = document.create('li', {
+            className: 'site-selector-arrow ' + button.className,
+            text: "▾"
+        }),
+        icon = document.create('img', {
+            src: site.IconUrl,
+            alt: site.LongName,
+            title: "Switch site from " + site.LongName
+        }),
+        wrapper = document.create('span', {
+            className: 'site-icon-wrapper'
+        });
+
+    wrapper.appendChild(icon);
+    item.insertBefore(wrapper, item.childNodes[0]);
+    list.appendChild(item);
+
+    // Set up the hidden selection box
+    var popup = document.create('div', {
+            className: 'site-selector-popup'
+        }),
+        loader = document.create('p', {
+            className: 'loading',
+            text: 'Loading list of sites...'
+        });
+
+    popup.appendChild(loader);
+    list.parentNode.appendChild(popup);
+
+    popup = $(popup).click(function () { return false; });
+    item = $(item).click(togglePopup);
+    $(document).click(hidePopup);
+
+    var nav = $(list.parentNode),
+        input,
+        displayed = false,
+        fetchSites = true;
+
+    function togglePopup() {
+        if (!displayed) {
+            showPopup();
+        } else {
+            hidePopup();
+        }
+
+        return false;
+    }
+
+    function showPopup() {
+        if (fetchSites) {
+            fetchSites = false;
+
+            popup.css({
+                top: (item.offset().top + item.outerHeight()),
+                left: ((nav.offset().left + nav.outerWidth()) - popup.outerWidth())
+            });
+
+            $.get('/sites', prepareAutocomplete);
+        }
+
+        item.addClass('youarehere');
+        popup.show();
+        displayed = true;
+
+        if (input) {
+            input.focus();
+        }
+    }
+
+    function hidePopup() {
+        if (button.className !== 'youarehere') {
+            item.removeClass('youarehere');
+        }
+
+        popup.hide();
+        displayed = false;
+
+        if (input) {
+            input.val(null);
+        }
+    }
+
+    function htmlEncode(text) {
+        return document.createElement("div").appendChild(document.createTextNode(text)).parentNode.innerHTML;
+    }
+
+    function prepareAutocomplete(sites) {
+        input = document.create('input', {
+            placeholder: 'search by name or url'
+        });
+
+        var container = document.create('div', {
+            className: 'ac_results'
+        });
+
+        loader.parentNode.replaceChild(input, loader);
+        input.parentNode.appendChild(container);
+
+        input = $(input);
+
+        input.width(popup.width() - (input.outerWidth(true) - input.width()));
+        input.autocomplete(sites, {
+            container: $(container),
+            minChars: 2,
+            matchContains: 'word',
+            autoFill: false,
+            width: '100%',
+            formatItem: function (item) {
+                return '<img src="' + item.IconUrl + '"/> ' + htmlEncode(item.LongName);
+            },
+            formatMatch: function (item) {
+                return htmlEncode(item.LongName + " " + item.Url);
+            },
+            formatResult: function (item) {
+                return item.LongName;
+            }
+        }).result(function (event, site) {
+            hidePopup();
+
+            icon.src = site.IconUrl;
+            icon.title = "Switch site from " + site.LongName;
+            button.href = "/" + site.Name.toLowerCase() + "/query/new";
+        });
+        input.focus();
+    }
+};

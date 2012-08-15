@@ -15,42 +15,8 @@ namespace StackExchange.DataExplorer.Helpers
     {
         private const int MAX_RESULTS = 50000;
 
-        private static readonly Dictionary<Type, ResultColumnType> ColumnTypeMap = new Dictionary<Type, ResultColumnType>
-                                                                                       {
-                                                                                           {
-                                                                                               typeof (int),
-                                                                                               ResultColumnType.Number
-                                                                                               },
-                                                                                           {
-                                                                                               typeof (long),
-                                                                                               ResultColumnType.Number
-                                                                                               },
-                                                                                           {
-                                                                                               typeof (float),
-                                                                                               ResultColumnType.Number
-                                                                                               },
-                                                                                           {
-                                                                                               typeof (double),
-                                                                                               ResultColumnType.Number
-                                                                                               },
-                                                                                           {
-                                                                                               typeof (decimal),
-                                                                                               ResultColumnType.Number
-                                                                                               },
-                                                                                           {
-                                                                                               typeof (string),
-                                                                                               ResultColumnType.Text
-                                                                                               },
-                                                                                           {
-                                                                                               typeof (DateTime),
-                                                                                               ResultColumnType.Date
-                                                                                               }
-                                                                                       };
-
         private static readonly Dictionary<string, Func<SqlConnection, IEnumerable<object>, List<object>>> magic_columns
             = GetMagicColumns();
-
-
 
         static void AddBody(StringBuilder buffer, QueryResults results, Site site)
         {
@@ -326,7 +292,21 @@ namespace StackExchange.DataExplorer.Helpers
                                 }
                             }
                             command.CommandTimeout = AppSettings.QueryTimeout;
-                            PopulateResults(results, command, messages, query.IncludeExecutionPlan);
+
+                            try
+                            {
+                                PopulateResults(results, command, result, messages, query.IncludeExecutionPlan);
+                            }
+                            catch (Exception ex)
+                            {
+                                // Ugh. So, if we cancel the query in-process, we get an exception...
+                                // But we have no good way of knowing that the exception here is actually
+                                // *that* exception...so we'll just assume it was if the state is Cancelled
+                                if (result == null || result.State != AsyncQueryRunner.AsyncState.Cancelled)
+                                {
+                                    throw ex;
+                                }
+                            }
                         }
 
                         if (query.IncludeExecutionPlan)
@@ -358,14 +338,20 @@ namespace StackExchange.DataExplorer.Helpers
         /// </summary>
         /// <param name="results"><see cref="QueryResults" /> instance to populate with results.</param>
         /// <param name="command">SQL command to execute.</param>
+        /// <param name="result"><see cref="AsyncResult"/> instance to use to mark state changes.</param>
         /// <param name="messages"><see cref="StringBuilder" /> instance to which to append messages.</param>
         /// <param name="IncludeExecutionPlan">If true indciates that the query execution plans are expected to be contained
         /// in the results sets; otherwise, false.</param>
-        private static void PopulateResults(QueryResults results, SqlCommand command, StringBuilder messages, bool IncludeExecutionPlan)
+        private static void PopulateResults(QueryResults results, SqlCommand command, AsyncQueryRunner.AsyncResult result, StringBuilder messages, bool IncludeExecutionPlan)
         {
             QueryPlan plan = new QueryPlan();
             using (SqlDataReader reader = command.ExecuteReader())
             {
+                if (result != null && reader.HasRows)
+                {
+                    result.HasOutput = true;
+                }
+
                 do
                 {
                     // Check to see if the resultset is an execution plan
@@ -396,7 +382,7 @@ namespace StackExchange.DataExplorer.Helpers
                             var columnInfo = new ResultColumnInfo();
                             columnInfo.Name = reader.GetName(i);
                             ResultColumnType colType;
-                            if (ColumnTypeMap.TryGetValue(reader.GetFieldType(i), out colType))
+                            if (ResultColumnInfo.ColumnTypeMap.TryGetValue(reader.GetFieldType(i), out colType))
                             {
                                 columnInfo.Type = colType;
                             }
@@ -493,7 +479,11 @@ namespace StackExchange.DataExplorer.Helpers
                 results = ExecuteNonCached(query, site, user, result);
                 results.FromCache = false;
 
-                AddResultToCache(results, query, site, cache != null);
+                // Don't cache cancelled results, since we don't know what state they're in...
+                if (result != null && !result.Cancelled)
+                {
+                    AddResultToCache(results, query, site, cache != null);
+                }
             }
             else
             {

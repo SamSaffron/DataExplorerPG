@@ -171,7 +171,6 @@ img {
 
 #header
 {
-    position: relative;
     margin-bottom: 0px;
     color: #000;
     padding: 0;
@@ -216,6 +215,70 @@ img {
     background-color: #FFFFCC;
     color: #333333;
     font-weight: bold;
+}
+
+ul li.site-selector-arrow {
+  border-left: 1px solid #666666;
+  color: #FFFFFF;
+  cursor: pointer;
+  font-size: 20px;
+  margin-right: 0px;
+  padding: 6px 4px 5px 4px;
+}
+
+.site-selector-arrow .site-icon-wrapper {
+  background-color: #DADADA;
+  border-radius: 2px 2px;
+  float:left;
+  margin: -2px 4px -2px 2px;
+  padding: 2px;
+}
+
+.site-selector-arrow .site-icon-wrapper img {
+  height: 16px;
+  width: 16px;
+}
+
+.nav li:hover + .site-selector-arrow, .site-selector-arrow:hover, .site-selector-arrow.youarehere {
+  background-color: #0C57A0;
+  border-left-color: #0B4680;
+}
+
+.nav li:hover + .site-selector-arrow .site-icon-wrapper, .site-selector-arrow:hover .site-icon-wrapper, .site-selector-arrow.youarehere .site-icon-wrapper {
+  background-color: #D9E6F3;
+}
+
+.site-selector-popup {
+  background-color: #D9E6F3;
+  border: 1px solid #0C57A0;
+  border-top-color: #0B4680;
+  display: none;
+  font-size: 14px;
+  position: absolute;
+  width: 300px;
+  z-index: 500;
+}
+
+.site-selector-popup p.loading {
+  color: #0C57A0;
+  font-style: italic;
+  margin: 0.5em 8px;
+}
+
+.site-selector-popup input {
+  margin: 0.5em 4px;
+}
+
+.site-selector-popup .ac_results li {
+  background-color: transparent;
+  border-top: 1px solid #78A2CA;
+  float: none;  
+  margin: 0px;
+  padding: 3px 5px 2px 5px;
+}
+
+.site-selector-popup .ac_results li.ac_over {
+  background-color: #FFFFFF;
 }
 
 #main
@@ -426,6 +489,39 @@ div#title
     text-decoration: none;
 }
 
+.tabular-list, .sublist
+{
+  margin-bottom: 5px;
+  margin-top: 5px;
+}
+
+.tabular-list
+{
+  margin-left: 12px;
+}
+
+.tabular-list dt
+{
+  background-color: #F7F7F7;
+  clear: both;
+  float: left;
+  font-style: italic;
+  padding: 2px 3px;
+  margin: 1px 0px;
+  width: 15em;
+}
+
+.tabular-list dd
+{
+  padding: 3px 0px 3px 16em;
+  font-weight: bold;
+}
+
+.tabular-list dd em
+{
+  font-weight: normal;
+}
+
 /* Styles for validation helpers
 -----------------------------------------------------------*/
 .field-validation-error
@@ -591,11 +687,61 @@ ul.site-list .desc {
   padding: 6px 8px 5px 8px;
 }
 
+#schema {
+  position: relative;
+}
+
+#schema .hidden {
+  display: none;
+}
+
+#schema .table-data-panel {
+  background-color: rgba(255, 255, 255, 0.95);
+  left: 0;
+  position: absolute;
+  right: 0;
+}
+
+#schema .table-data-panel .schema-table {
+  background-color: #F7F7F7;
+  border-bottom: 1px dotted #CCC;
+  color: #606060;
+}
+
+#schema .table-data-panel table {
+  width: 100%;
+}
+
+#schema .table-data-wrapper {
+  overflow-y: auto;
+}
+
+#schema .table-data-panel th {
+  background-color: #FDFDFD;
+  border-bottom: 1px solid #DFDFDF;
+  color: #404040;
+  font-weight: bold;
+  padding: 5px 5px 4px 5px;
+}
+
+#schema .table-data-panel td {
+  border-bottom: 1px solid #FAFAFA;
+  border-left: 1px solid #FAFAFA;
+}
+
+#schema .table-data-panel td:first-child {
+  border-left-width: 0px;
+}
+
+#schema .table-data-panel .number {
+  text-align: right;
+}
+
 .heading .buttons {
   float: right;
 }
 
-.heading .buttons .button {
+.heading .buttons .button, #schema ul .button, #schema .table-data-panel .button {
   background: transparent url('/content/images/sprites.png') no-repeat scroll 0px 0px;
   cursor: pointer;
   float: left;
@@ -603,6 +749,19 @@ ul.site-list .desc {
   overflow: hidden;
   text-indent: -999em;
   width: 12px;
+}
+
+#schema .table-data-panel .table-data-close {
+  background-position: 0px -392px;
+}
+
+#schema .schema-table .button {
+  float: right;
+}
+
+#schema ul .table-data {
+  background-position: 0px -374px;
+  height: 14px;
 }
 
 .heading .buttons .collapse {
@@ -735,7 +894,7 @@ ul.site-list .desc {
   color: #606060;
   display: inline-block;
   font-weight: bold;
-  margin-left: 15px;
+  margin-left: 9px;
 }
 
 #query-options {
@@ -756,10 +915,10 @@ ul.site-list .desc {
   margin: 0px 5px 0px 0px;
 }
 
-#submit-query {
+#submit-query, #cancel-query {
   cursor: pointer;
   font-weight: bold;
-  margin: 0px;
+  margin: 0px 6px 0px 0px;
   padding: 3px 5px 3px 5px;
 }
 
@@ -852,6 +1011,12 @@ ul.linkbar li {
   display: none;
   margin-top: 5px;
   padding: 10px 14px 10px 14px;
+}
+
+#error-message.notice {
+  background-color: #E9F5E9;
+  border: 1px solid #16B500;
+  color: #209403;
 }
 
 #query {

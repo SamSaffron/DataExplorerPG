@@ -1,5 +1,5 @@
 ﻿DataExplorer.QueryEditor = (function () {
-    var editor, field, activeError, params = {}, query,
+    var editor, field, params = {}, query,
         options = {
             'mode': 'text/x-t-sql'
         };
@@ -23,7 +23,11 @@
         if (target.nodeName === 'TEXTAREA') {
             editor = CodeMirror.fromTextArea(target, $.extend({}, options, {
                 'lineNumbers': true,
-                'onChange': onChange
+                'extraKeys': {
+                    'Ctrl-Enter': function () {
+                        field.closest('form').submit();
+                    }
+                }
             }));
         } else {
             query = target[_textContent];
@@ -61,36 +65,13 @@
         // where it's coming from.
         if (value.charCodeAt(value.length - 1) === 8203) {
             value = value.substring(0, value.length - 1);
-
-            // Explicitly update the field when this happens
-            field.val(value);
         }
+
+        // Explicitly update the field, since CodeMirror might not have gotten a
+        // chance to yet
+        field.val(value);
 
         return value;
-    }
-
-    function registerHandler(event, callback) {
-        if (events[event] && typeof callback === 'function') {
-            events[event].push(callback);
-        }
-    }
-
-    function onChange() {
-        if (!DataExplorer.options.enableAdvancedSqlErrors)
-            return;
-
-        if (activeError !== null) {
-            editor.setLineClass(activeError, null);
-            activeError = null;
-        }
-    }
-
-    function onError(line) {
-        if (!DataExplorer.options.enableAdvancedSqlErrors || !editor) {
-            return;
-        }
-        activeError = +line;
-        editor.setLineClass(activeError, 'error-line');
     }
 
     function parseParameters(sql) {
@@ -211,10 +192,115 @@
     return {
         'create': create,
         'value': getValue,
-        'change': registerHandler,
-        'error': onError,
         'exists': exists,
         'parse': parseParameters
+    };
+})();
+
+DataExplorer.TableHelpers = (function () {
+    var tables,
+        infoTemplate = document.create('span', {
+            className: 'button table-data',
+            text: 'show table',
+            title: 'show the contents of this table'
+        }),
+        closeTemplate = document.create('span', {
+            className: 'button table-data-close',
+            text: 'close table',
+            title: 'hide the contents of this table'
+        }),
+        dataTemplate = document.create('div', {
+            className: 'table-data-panel hidden'
+        });
+
+    dataTemplate.appendChild(document.create('span', {
+        className: 'schema-table'
+    }));
+    dataTemplate.appendChild((function () {
+        var wrapper = document.create('div', {
+                className: 'table-data-wrapper'
+            }),
+            table = document.createElement('table'),
+            tableHead = document.createElement('thead'),
+            tableBody = document.createElement('tbody');
+
+        wrapper.appendChild(table);
+        table.appendChild(tableHead);
+        table.appendChild(tableBody);
+        tableHead.appendChild(document.createElement('tr'));
+        tableBody.appendChild(document.createElement('tr'));
+
+        return wrapper;
+    })());
+    
+    function init(tableData) {
+        var shema = document.getElementById('schema');
+        tables = tableData;
+
+        $('ul .schema-table', schema).each(function () {
+            var tableName = this[_textContent],
+                data = tables[tableName];
+
+            if (data) {
+                var infoIcon = infoTemplate.cloneNode(true),
+                    closeIcon = closeTemplate.cloneNode(true),
+                    panel = dataTemplate.cloneNode(true), $panel = $(panel);
+
+                this.appendChild(infoIcon);
+
+                panel.children[0][_textContent] = tableName;
+                panel.children[0].appendChild(closeIcon);
+
+                $(closeIcon).click(function () {
+                    $panel.hide();
+                });
+
+                var table = panel.getElementsByTagName('table')[0],
+                    tableBody = table.children[1],
+                    header = table.children[0].children[0],
+                    record = tableBody.children[0];
+
+                tableBody.removeChild(record);
+
+                for (var i = 0; i < data.columns.length; ++i) {
+                    header.appendChild(document.create('th', {
+                        text: data.columns[i].name
+                    }));
+                    record.appendChild(document.create('td', {
+                        className: data.columns[i].type.toLowerCase()
+                    }));
+                }
+
+                for (var i = 0; i < data.rows.length; ++i) {
+                    var row = record.cloneNode(true);
+
+                    for (var c = 0; c < data.columns.length; ++c) {
+                        row.children[c][_textContent] = data.rows[i][c];
+                    }
+
+                    tableBody.appendChild(row);
+                }
+
+                schema.insertBefore(panel, schema.children[0]);
+
+                $(infoIcon).click(function () {
+                    $panel.show();
+                    return false;
+                });
+            }
+        });
+    }
+
+    // This is terrible, because it requires the outside code to
+    // account for the header height...will fix later
+    function resize(height) {
+        // Could store references directly to the wrapper, too...
+        $('#schema .table-data-wrapper').css({ height: height + 'px' });
+    }
+
+    return {
+        'init': init,
+        'resize': resize
     };
 })();
 
@@ -256,6 +342,7 @@ DataExplorer.ready(function () {
                 offset = schema.outerHeight() - list.height();
 
             list.height(remaining - offset);
+            DataExplorer.TableHelpers.resize((available - offset) + 9);
 
             if (wrapper) {
                 offset = wrapper.closest('.CodeMirror').outerHeight() - wrapper.height();
@@ -353,33 +440,76 @@ DataExplorer.ready(function () {
         var cleanup = function () {
             $('#loading').hide();
 
-            form.find('input, button').prop('disabled', false);
-        }
+            form.find('input, button').prop('disabled', function () {
+                return this.id == 'cancel-query';
+            });
+        };
 
         var fail = function() {
             showError({ 'error': "Something unexpected went wrong while running "
                             + "your query. Don't worry, blame is already being assigned." });
+        };
+
+        var cancel = function () {
+            showError({ 'error': 'Query execution has been cancelled' }, 'notice');
         }
 
+        var pending = { request: null, timeout: null, setupCancel: true };
         var success = function(response) {
             if (response.running === true)
             {
-                setTimeout(function(){
-                       $.ajax({
+                var poll = function () {
+                    pending.timeout = setTimeout(function(){
+                        pending.request = $.ajax({
                             'type': 'GET',
                             'url': '/query/job/' + response.job_id,
                             'success': success,
                             'error': [cleanup, fail],
-                            'cache': false,
+                            'cache': false
                         });  
-                }, 1500);
+                    }, 1500);
+                };
+
+                if (!pending.timeout && pending.setupCancel) {
+                    var job = response.job_id;
+                    pending.setupCancel = false;
+
+                    $('#cancel-query').one('click', function () {
+                        this.disabled = true;
+
+                        clearTimeout(pending.timeout);
+
+                        if (pending.request) {
+                            pending.request.abort();
+                        }
+
+                        $.ajax({
+                            type: 'POST',
+                            url:  '/query/job/' + job + '/cancel',
+                            success: function (response) {
+                                if (response.cancelled) {
+                                    cleanup();
+                                    cancel();
+                                } else {
+                                    // There were some results, so we're going to try and get whatever
+                                    // was being returned when the user decided to cancel
+                                    poll();
+                                }
+                            },
+                            error: [cleanup, fail],
+                            cache: false
+                        });
+                    }).prop('disabled', false);
+                }
+
+                poll();
             }
             else 
             {
                 cleanup();
                 parseQueryResponse(response);
             }
-        }
+        };
 
         if (verifyParameters()) {
             var data = form.serialize();
@@ -597,7 +727,7 @@ DataExplorer.ready(function () {
         else if (response.targetSites == 2) { target = "all-meta-"; } // all meta sites
         else if (response.targetSites == 3) { target = "all-non-meta-"; } // all non meta sites
 
-        DataExplorer.template('a.templated', 'href', {
+        DataExplorer.template('a.templated.site', 'href', {
             'targetsites': target,
             'site': response.siteName,
             'revisionid': response.revisionId,
@@ -606,15 +736,14 @@ DataExplorer.ready(function () {
             'id' : response.querySetId
         });
 
-        if (userid) {
-            userid = (params ? '&' : '?') + 'UserId=' + userid;
-
-            var related = $('a.templated.related-site');
-
-            if (related.length) {
-                related[0].setAttribute('href', related[0].getAttribute('href') + userid);
-            }
-        }
+        DataExplorer.template('a.templated:not(.site), a.template.related-site', 'href', {
+            'targetsites': target,
+            'site': response.siteName,
+            'revisionid': response.revisionId,
+            'slug': slug,
+            'params': (params ? params + '&' : '?') + (userid ? 'UserId=' + userid : ''),
+            'id' : response.querySetId
+        });
 
         if (response.created) {
             var title = response.created.replace(/\.\d+Z/, 'Z'),
@@ -710,18 +839,14 @@ DataExplorer.ready(function () {
         }
     }
 
-    function showError(response) {
+    function showError(response, className) {
         if (response && !response.error) {
             error.hide();
 
             return false;
         }
 
-        if (response.line) {
-            DataExplorer.QueryEditor.error(response.line);
-        }
-
-        error.text(response.error).show();
+        error.text(response.error).show()[0].className = className || '';
 
         return true;
     }
@@ -1160,10 +1285,11 @@ function renderGraph(resultSet) {
     {
         var columns = {}; 
         for (var row = 0; row < resultSet.rows.length; row++) {
-            var columnName = resultSet.rows[row][1];
+            var columnLabel = resultSet.rows[row][1],
+                columnName = "col_" + columnLabel;
             if (columns[columnName] === undefined)
             {
-                columns[columnName] = (series.push({label: columnName, data: [] }) - 1);
+                columns[columnName] = (series.push({label: columnLabel, data: [] }) - 1);
             }
             series[columns[columnName]].data.push([resultSet.rows[row][0],  resultSet.rows[row][2]]);
         }

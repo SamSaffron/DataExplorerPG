@@ -11,7 +11,6 @@ namespace StackExchange.DataExplorer.Controllers
 {
     public class QueryController : StackOverflowController
     {
-
         [Route(@"query/job/{guid}")]
         public ActionResult PollJob(Guid guid)
         {
@@ -40,6 +39,20 @@ namespace StackExchange.DataExplorer.Controllers
                 return TransformExecutionException(ex);
             }
 
+        }
+
+        [HttpPost]
+        [Route(@"query/job/{guid}/cancel")]
+        public ActionResult CancelJob(Guid guid)
+        {
+            var result = AsyncQueryRunner.CancelJob(guid);
+
+            if (result == null)
+            {
+                return Json(new { error = "can't cancel unknown job!" });
+            }
+
+            return Json(new { cancelled = !result.HasOutput, job_id = result.JobId });
         }
 
         [HttpPost]
@@ -102,7 +115,7 @@ namespace StackExchange.DataExplorer.Controllers
                     throw asyncResults.Exception; 
                 }
 
-                if (asyncResults.State == AsyncQueryRunner.AsyncState.Success)
+                if (asyncResults.State == AsyncQueryRunner.AsyncState.Success || asyncResults.State == AsyncQueryRunner.AsyncState.Cancelled)
                 {
                     results = asyncResults.QueryResults;
                 }
@@ -353,8 +366,15 @@ select @newId, RevisionId from QuerySetRevisions where QuerySetId = @oldId", new
                 return PageNotFound();
             }
 
+            var parsedQuery = new ParsedQuery(query.QueryBody, Request.Params);
+
+            if (!parsedQuery.IsExecutionReady)
+            {
+                return PageBadRequest();
+            }
+
             CachedResult cachedResults = QueryUtil.GetCachedResults(
-                new ParsedQuery(query.QueryBody, Request.Params),
+                parsedQuery,
                 Site.Id
             );
             List<ResultSet> resultSets;
@@ -366,7 +386,7 @@ select @newId, RevisionId from QuerySetRevisions where QuerySetId = @oldId", new
             else
             {
                 resultSets = QueryRunner.GetResults(
-                    new ParsedQuery(query.QueryBody, Request.Params),
+                    parsedQuery,
                     site,
                     CurrentUser
                 ).ResultSets;
@@ -455,7 +475,7 @@ select @newId, RevisionId from QuerySetRevisions where QuerySetId = @oldId", new
             }
 
             ViewData["query_action"] = "save/" + Site.Id +  "/" + querySetId;
-
+            ViewData["HelperTables"] = HelperTableCache.GetCacheAsJson(Site);
 
             return View("Editor", new ViewModel.QuerySetViewModel 
             { 
@@ -479,8 +499,15 @@ select @newId, RevisionId from QuerySetRevisions where QuerySetId = @oldId", new
                 return PageNotFound();
             }
 
+            var parsedQuery = new ParsedQuery(query.QueryBody, Request.Params);
+
+            if (!parsedQuery.IsExecutionReady)
+            {
+                return PageBadRequest();
+            }
+
             CachedResult cache = QueryUtil.GetCachedResults(
-                new ParsedQuery(query.QueryBody, Request.Params),
+                parsedQuery,
                 Site.Id
             );
 
@@ -503,6 +530,7 @@ select @newId, RevisionId from QuerySetRevisions where QuerySetId = @oldId", new
             }
 
             ViewData["query_action"] = "save/" + Site.Id;
+            ViewData["HelperTables"] = HelperTableCache.GetCacheAsJson(Site);
 
             return View("Editor", null);
         }

@@ -15,7 +15,21 @@ namespace StackExchange.DataExplorer.Models
 
         private UserPreferenceDictionary _preferences = null;
 
-        public bool HideSchema { 
+        public bool AllowRelaxedIdentifierMatch
+        {
+            get
+            {
+                return Preferences.Get<bool>(Preference.AllowRelaxedIdentifierMatch, AppSettings.RelaxedIdentifierDefault);
+            }
+            set
+            {
+                Preferences.Set(Preference.AllowRelaxedIdentifierMatch, value);
+                SavePreferences();
+            }
+        }
+
+        public bool HideSchema
+        { 
             get 
             {
                 return Preferences.Get<bool>(Preference.HideSchema, false);
@@ -41,6 +55,24 @@ namespace StackExchange.DataExplorer.Models
                 if (value != DefaultQuerySort)
                 {
                     Preferences.Set(Preference.DefaultQuerySort, value);
+                    SavePreferences();
+                }
+            }
+        }
+
+        public int? DefaultQueryPageSize
+        {
+            get
+            {
+                var value = Preferences.Get<int>(Preference.DefaultQueryPageSize, -1);
+
+                return value == -1 ? (int?)null : value;
+            }
+            set
+            {
+                if (value != DefaultQueryPageSize)
+                {
+                    Preferences.Set(Preference.DefaultQueryPageSize, value ?? -1);
                     SavePreferences();
                 }
             }
@@ -119,7 +151,9 @@ namespace StackExchange.DataExplorer.Helpers
     public enum Preference
     {
         HideSchema = 1,
-        DefaultQuerySort = 2
+        DefaultQuerySort = 2,
+        DefaultQueryPageSize = 3,
+        AllowRelaxedIdentifierMatch = 4
     }
 
     public static class PreferenceKey

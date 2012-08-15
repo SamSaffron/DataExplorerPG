@@ -22,6 +22,7 @@ namespace StackExchange.DataExplorer.Controllers
             base.OnActionExecuting(c);
         }
 
+        [ValidateAntiForgeryToken]
         [Route("admin/whitelist/approve/{id:int}", HttpVerbs.Post)]
         public ActionResult ApproveWhiteListEntry(int id)
         {
@@ -29,6 +30,7 @@ namespace StackExchange.DataExplorer.Controllers
             return Json("ok");
         }
 
+        [ValidateAntiForgeryToken]
         [Route("admin/whitelist/remove/{id:int}", HttpVerbs.Post)]
         public ActionResult RemoveWhiteListEntry(int id)
         {
@@ -39,7 +41,7 @@ namespace StackExchange.DataExplorer.Controllers
         [Route("admin/whitelist")]
         public ActionResult WhiteList()
         {
-            SetHeader("Open Id Whitelist");
+            SetHeader("OpenID Whitelist");
 
             return View(Current.DB.OpenIdWhiteList.All()); 
         }
@@ -47,17 +49,42 @@ namespace StackExchange.DataExplorer.Controllers
         [Route("admin")]
         public ActionResult Index()
         {
+            SetHeader("Administration Utilities");
+
+            ViewData["CacheCount"] = Current.DB.Query<int>("SELECT COUNT(*) FROM CachedResults").First();
+
             return View();
         }
 
-        [Route("admin/clear-cache")]
+        [ValidateAntiForgeryToken]
+        [Route("admin/refresh-settings", HttpVerbs.Post)]
+        public ActionResult RefreshSettings()
+        {
+            AppSettings.Refresh();
+
+            return Json("ok");
+        }
+
+        [ValidateAntiForgeryToken]
+        [Route("admin/clear-table-cache", HttpVerbs.Post)]
+        public ActionResult ClearTableCache()
+        {
+            HelperTableCache.Refresh();
+
+            return Json("ok");
+        }
+
+        [ValidateAntiForgeryToken]
+        [Route("admin/clear-cache", HttpVerbs.Post)]
         public ActionResult ClearCache()
         {
             Current.DB.Execute("truncate table CachedResults");
             Current.DB.Execute("truncate table CachedPlans");
-            return Redirect("/admin");
+
+            return Json("ok");
         }
 
+        [ValidateAntiForgeryToken]
         [Route("admin/refresh-stats", HttpVerbs.Post)]
         public ActionResult RefreshStats()
         {
@@ -68,10 +95,10 @@ namespace StackExchange.DataExplorer.Controllers
 
             Current.DB.Execute("truncate table CachedResults");
             Current.DB.Execute("truncate table CachedPlans");
+            HelperTableCache.Refresh();
 
             return Content("sucess");
         }
-
 
         private Dictionary<string, user2user> userSorts = new Dictionary<string, user2user>()
         {
@@ -199,6 +226,7 @@ where Email is not null and len(rtrim(Email)) > 0 ");
             return View();
         }
 
+        [ValidateAntiForgeryToken]
         [Route("admin/merge-users-submit", HttpVerbs.Post)]
         public ActionResult MergeSubmit(int masterId, int mergeId)
         {
@@ -221,7 +249,7 @@ where Email is not null and len(rtrim(Email)) > 0 ");
             return View(dupes);
         }
 
-
+        [ValidateAntiForgeryToken]
         [Route("admin/useropenid/remove/{id:int}", HttpVerbs.Post)]
         public ActionResult RemoveUserOpenIdEntry(int id)
         {
