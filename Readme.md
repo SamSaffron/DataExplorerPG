@@ -23,6 +23,7 @@ Some cool features:
 4. Text or Grid based results
 5. Schema explorer 
 6. Graphing support
+7. Syntax highlighting
 
 
 ### Demo
