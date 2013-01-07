@@ -504,9 +504,10 @@ DataExplorer.initComposeButton = function (site) {
             className: 'site-icon-wrapper'
         });
 
-    wrapper.appendChild(icon);
-    item.insertBefore(wrapper, item.childNodes[0]);
-    list.appendChild(item);
+    // Don't need this for now
+    //wrapper.appendChild(icon);
+    //item.insertBefore(wrapper, item.childNodes[0]);
+    //list.appendChild(item);
 
     // Set up the hidden selection box
     var popup = document.create('div', {

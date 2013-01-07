@@ -242,6 +242,7 @@ ORDER BY
                 string sql =
                     @"
 select TABLE_NAME, COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH from INFORMATION_SCHEMA.COLUMNS
+where TABLE_SCHEMA = 'public'
 order by TABLE_NAME, ORDINAL_POSITION
 ";
                 using (var cmd = cnn.CreateCommand())
