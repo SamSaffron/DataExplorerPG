@@ -7,6 +7,7 @@ using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using System.Data.SqlClient;
 using System.Threading;
+using System.Data;
 
 namespace StackExchange.DataExplorer.Helpers
 {
@@ -61,7 +62,7 @@ namespace StackExchange.DataExplorer.Helpers
 
             public QueryContextData QueryContextData { get; set; }
 
-            public SqlCommand Command { get; set; }
+            public IDbCommand Command { get; set; }
             public bool Cancelled { get; set; }
             public bool HasOutput { get; set; }
         }

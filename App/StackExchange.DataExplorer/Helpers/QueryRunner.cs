@@ -8,6 +8,7 @@ using System.Text;
 using System.Web;
 using StackExchange.DataExplorer.Models;
 using Dapper;
+using System.Data;
 
 namespace StackExchange.DataExplorer.Helpers
 {
@@ -15,7 +16,7 @@ namespace StackExchange.DataExplorer.Helpers
     {
         private const int MAX_RESULTS = 50000;
 
-        private static readonly Dictionary<string, Func<SqlConnection, IEnumerable<object>, List<object>>> magic_columns
+        private static readonly Dictionary<string, Func<IDbConnection, IEnumerable<object>, List<object>>> magic_columns
             = GetMagicColumns();
 
         static void AddBody(StringBuilder buffer, QueryResults results, Site site)
@@ -250,8 +251,11 @@ namespace StackExchange.DataExplorer.Helpers
 
             var results = new QueryResults();
 
-            using (SqlConnection cnn = site.GetOpenConnection())
+            using (var cnn = site.GetOpenConnection())
             {
+
+                var sqlConnection = cnn as SqlConnection; 
+
                 // well we do not want to risk blocking, if somebody needs to change this we will need to add a setting
                 cnn.Execute("set transaction isolation level read uncommitted");
 
@@ -267,11 +271,14 @@ namespace StackExchange.DataExplorer.Helpers
                                                                      });
                 try
                 {
-                    cnn.InfoMessage += infoHandler;
-
-                    if (query.IncludeExecutionPlan)
+                    if (sqlConnection != null) 
                     {
-                        using (var command = new SqlCommand("SET STATISTICS XML ON", cnn))
+                        sqlConnection.InfoMessage += infoHandler;
+                    }
+
+                    if (query.IncludeExecutionPlan && sqlConnection != null)
+                    {
+                        using (var command = new SqlCommand("SET STATISTICS XML ON", sqlConnection))
                         {
                             command.ExecuteNonQuery();
                         }
@@ -281,8 +288,9 @@ namespace StackExchange.DataExplorer.Helpers
 
                     foreach (string batch in query.ExecutionSqlBatches)
                     {
-                        using (var command = new SqlCommand(batch, cnn))
+                        using (var command = cnn.CreateCommand()) 
                         {
+                            command.CommandText = batch;
                             if (result != null)
                             {
                                 result.Command = command;
@@ -320,7 +328,10 @@ namespace StackExchange.DataExplorer.Helpers
                 }
                 finally
                 {
-                    cnn.InfoMessage -= infoHandler;
+                    if (sqlConnection != null)
+                    {
+                        sqlConnection.InfoMessage -= infoHandler;
+                    }
                     results.Messages = messages.ToString();
                 }
 
@@ -342,15 +353,11 @@ namespace StackExchange.DataExplorer.Helpers
         /// <param name="messages"><see cref="StringBuilder" /> instance to which to append messages.</param>
         /// <param name="IncludeExecutionPlan">If true indciates that the query execution plans are expected to be contained
         /// in the results sets; otherwise, false.</param>
-        private static void PopulateResults(QueryResults results, SqlCommand command, AsyncQueryRunner.AsyncResult result, StringBuilder messages, bool IncludeExecutionPlan)
+        private static void PopulateResults(QueryResults results, IDbCommand command, AsyncQueryRunner.AsyncResult result, StringBuilder messages, bool IncludeExecutionPlan)
         {
             QueryPlan plan = new QueryPlan();
-            using (SqlDataReader reader = command.ExecuteReader())
+            using (var reader = command.ExecuteReader())
             {
-                if (result != null && reader.HasRows)
-                {
-                    result.HasOutput = true;
-                }
 
                 do
                 {
@@ -359,6 +366,7 @@ namespace StackExchange.DataExplorer.Helpers
                     {
                         if (reader.Read())
                         {
+                            result.HasOutput = true;
                             plan.AppendStatementPlan(reader[0].ToString());
                         }
                     }
@@ -393,6 +401,7 @@ namespace StackExchange.DataExplorer.Helpers
                         int currentRow = 0;
                         while (reader.Read())
                         {
+                            result.HasOutput = true;
                             if (currentRow++ >= MAX_RESULTS)
                             {
                                 results.Truncated = true;
@@ -554,7 +563,7 @@ namespace StackExchange.DataExplorer.Helpers
             }
         }
 
-        private static void ProcessMagicColumns(QueryResults results, SqlConnection cnn)
+        private static void ProcessMagicColumns(QueryResults results, IDbConnection cnn)
         {
             int index = 0;
             foreach (ResultSet resultSet in results.ResultSets)
@@ -594,7 +603,7 @@ namespace StackExchange.DataExplorer.Helpers
             }
         }
 
-        private static void ProcessColumn(SqlConnection cnn, int index, List<List<object>> rows, ResultColumnInfo column)
+        private static void ProcessColumn(IDbConnection cnn, int index, List<List<object>> rows, ResultColumnInfo column)
         {
             IEnumerable<object> values = rows.Select(row => row[index]);
             List<object> processedValues = magic_columns[column.Name](cnn, values);
@@ -627,9 +636,9 @@ namespace StackExchange.DataExplorer.Helpers
             }
         }
 
-        private static Dictionary<string, Func<SqlConnection, IEnumerable<object>, List<object>>> GetMagicColumns()
+        private static Dictionary<string, Func<IDbConnection, IEnumerable<object>, List<object>>> GetMagicColumns()
         {
-            return new Dictionary<string, Func<SqlConnection, IEnumerable<object>, List<object>>>
+            return new Dictionary<string, Func<IDbConnection, IEnumerable<object>, List<object>>>
             {
                 { "Post Link", GetPostLinks },
                 { "User Link", GetUserLinks },
@@ -638,12 +647,12 @@ namespace StackExchange.DataExplorer.Helpers
             };
         }
 
-        public static List<object> GetCommentLinks(SqlConnection cnn, IEnumerable<object> items)
+        public static List<object> GetCommentLinks(IDbConnection cnn, IEnumerable<object> items)
         {
             return LookupIds(cnn, items, @"SELECT Id, Text FROM Comments WHERE Id IN ");
         }
 
-        public static List<object> GetSuggestedEditLinks(SqlConnection cnn, IEnumerable<object> items)
+        public static List<object> GetSuggestedEditLinks(IDbConnection cnn, IEnumerable<object> items)
         {
             return LookupIds(cnn, items,
                              @"select Id, case when RejectionDate is not null then 'rejected' when ApprovalDate is not null then 'accepted' else 'pending' end 
@@ -651,13 +660,13 @@ namespace StackExchange.DataExplorer.Helpers
                             where Id in ");
         }
 
-        public static List<object> GetUserLinks(SqlConnection cnn, IEnumerable<object> items)
+        public static List<object> GetUserLinks(IDbConnection cnn, IEnumerable<object> items)
         {
             return LookupIds(cnn, items,
                              @"select Id, case when DisplayName is null or LEN(DisplayName) = 0 then 'unknown' else DisplayName end from Users where Id in ");
         }
 
-        public static List<object> GetPostLinks(SqlConnection cnn, IEnumerable<object> items)
+        public static List<object> GetPostLinks(IDbConnection cnn, IEnumerable<object> items)
         {
             return LookupIds(cnn, items,
                              @"select p1.Id, isnull(p1.Title,p2.Title) from Posts p1 
@@ -665,7 +674,7 @@ namespace StackExchange.DataExplorer.Helpers
         }
 
 
-        public static List<object> LookupIds(SqlConnection cnn, IEnumerable<object> items, string lookupSql)
+        public static List<object> LookupIds(IDbConnection cnn, IEnumerable<object> items, string lookupSql)
         {
             var rval = new List<object>();
             if (items.Count() == 0) return rval;
@@ -685,10 +694,11 @@ namespace StackExchange.DataExplorer.Helpers
                 .Append(" ) ");
 
             var linkMap = new Dictionary<long, object>();
-            using (SqlCommand cmd = cnn.CreateCommand())
+
+            using (var cmd = cnn.CreateCommand())
             {
                 cmd.CommandText = query.ToString();
-                using (SqlDataReader reader = cmd.ExecuteReader())
+                using (var reader = cmd.ExecuteReader())
                 {
                     while (reader.Read())
                     {

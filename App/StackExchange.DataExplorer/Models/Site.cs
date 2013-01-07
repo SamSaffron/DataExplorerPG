@@ -99,19 +99,22 @@ namespace StackExchange.DataExplorer.Models
             get { return "/" + Name.ToLower() + "/atom"; }
         }
 
-        public SqlConnection GetConnection(int maxPoolSize)
+        public IDbConnection GetConnection(int maxPoolSize)
         {
             // TODO: do we even need this method any longer? are we still supporting about odata?
             var cs = ConnectionString + (UseConnectionStringOverride ? "" : string.Format("Max Pool Size={0};",maxPoolSize));
             return new SqlConnection(cs);
         }
 
-        public SqlConnection GetOpenConnection()
+        public IDbConnection GetOpenConnection()
         {
-            var cnn = new SqlConnection(ConnectionString);
+            var cnn = new Npgsql.NpgsqlConnection("Server=10.0.0.50;Port=5432;Database=discourse_development;User Id=readonly;Password=readonly");
+            cnn.Open();
+            return cnn;
+           /* var cnn = new SqlConnection(ConnectionString);
             cnn.Open();
             if (AppSettings.FetchDataInReadUncommitted) { cnn.Execute("set transaction isolation level read uncommitted"); }
-            return cnn;
+            return cnn;*/
         }
 
         public bool SharesUsers(Site site)
@@ -148,8 +151,8 @@ ORDER BY
 
         public void UpdateStats()
         {
-            using (SqlConnection cnn = GetOpenConnection())
-            using( var cmd = new SqlCommand())
+            using (var cnn = GetOpenConnection())
+            using( var cmd = cnn.CreateCommand())
             {
                
                 cmd.Connection = cnn;
@@ -207,7 +210,7 @@ ORDER BY
             if (!user.IsAnonymous && user.Email != null)
             {
 
-                using (SqlConnection cnn = GetOpenConnection())
+                using (var cnn = GetOpenConnection())
                 {
                     string hash = Util.GravatarHash(user.Email);
                     try
@@ -234,17 +237,17 @@ ORDER BY
             var tables = new List<TableInfo>();
 
 
-            using (SqlConnection cnn = GetOpenConnection())
+            using (var cnn = GetOpenConnection())
             {
                 string sql =
                     @"
 select TABLE_NAME, COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH from INFORMATION_SCHEMA.COLUMNS
 order by TABLE_NAME, ORDINAL_POSITION
 ";
-                using (var cmd = new SqlCommand(sql))
+                using (var cmd = cnn.CreateCommand())
                 {
-                    cmd.Connection = cnn;
-                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    cmd.CommandText = sql;
+                    using (var reader = cmd.ExecuteReader())
                     {
                         columns = new List<ColumnInfo>();
                         while (reader.Read())
