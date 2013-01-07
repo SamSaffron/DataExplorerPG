@@ -24,4 +24,9 @@ Some cool features:
 5. Schema explorer 
 6. Graphing support
 
+
+### Demo
+
+A demo/working site with the official release is at: http://data.stackexchange.com
+
 <img src="http://cdn.community-tracker.com/uploads/site_20/2/se_shot.PNG">
