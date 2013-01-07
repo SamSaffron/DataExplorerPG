@@ -13,4 +13,15 @@ Main reason is time, it would be rather risky to add my changes as they are into
 
 ### What it does? 
 
-- TODO, add some screen shots
+Data Explorer allows you to run arbitrary queries against any SQL Server or Postgres database in a modern Web frontend. 
+
+Some cool features:
+
+1. AJAX ui meaning queries run in the background and update the UI when done
+2. Full history for all queries you ever ran AND full revision list per query
+3. CSV download
+4. Text or Grid based results
+5. Schema explorer 
+6. Graphing support
+
+<img src="http://cdn.community-tracker.com/uploads/site_20/2/se_shot.PNG">
