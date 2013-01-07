@@ -30,6 +30,7 @@ namespace StackExchange.DataExplorer.Models
         public DateTime? LastPost { get; set; }
         public string ImageBackgroundColor { get; set; }
         public string ConnectionStringOverride { get; set; }
+        public string ConnectionProvider { get; set; }
         public int? ParentId { get; set; }
         // above props are columns on dbo.Sites
 
@@ -94,27 +95,31 @@ namespace StackExchange.DataExplorer.Models
             }
         }
 
-        public string ODataEndpoint
-        {
-            get { return "/" + Name.ToLower() + "/atom"; }
-        }
 
-        public IDbConnection GetConnection(int maxPoolSize)
-        {
-            // TODO: do we even need this method any longer? are we still supporting about odata?
-            var cs = ConnectionString + (UseConnectionStringOverride ? "" : string.Format("Max Pool Size={0};",maxPoolSize));
-            return new SqlConnection(cs);
-        }
 
         public IDbConnection GetOpenConnection()
         {
-            var cnn = new Npgsql.NpgsqlConnection("Server=10.0.0.50;Port=5432;Database=discourse_development;User Id=readonly;Password=readonly");
+
+            IDbConnection cnn; 
+            if (ConnectionProvider != null) 
+            {
+                if (ConnectionProvider == "Npgsql.NpgsqlConnection")
+                {
+                    cnn = new Npgsql.NpgsqlConnection(ConnectionString);
+                }
+                else
+                {
+                    throw new Exception("Unknown connection provider");
+                }
+            } 
+            else 
+            {
+                cnn = new SqlConnection(ConnectionString);
+               
+            }
             cnn.Open();
+            if (AppSettings.FetchDataInReadUncommitted && cnn is SqlConnection) { cnn.Execute("set transaction isolation level read uncommitted"); }
             return cnn;
-           /* var cnn = new SqlConnection(ConnectionString);
-            cnn.Open();
-            if (AppSettings.FetchDataInReadUncommitted) { cnn.Execute("set transaction isolation level read uncommitted"); }
-            return cnn;*/
         }
 
         public bool SharesUsers(Site site)

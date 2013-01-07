@@ -5,10 +5,6 @@
 <head>
     @{Site site = Current.Controller.Site;}
     <title>@Html.Raw((string)ViewData["PageTitle"])</title>
-    @if (site != null)
-    {
-        @Html.Raw(string.Format("<link rel=\"odata.service\" title=\"{0}\" href=\"{1}\"/>", site.Name, site.ODataEndpoint))
-    }
     @Html.Raw(AssetPackager.LinkCss("sitecss"))
     @RenderSection("additionalStyles", required: false)
 
